@@ -12,6 +12,7 @@ use Psr\Container\ContainerInterface;
 use Psr\Log\LoggerInterface;
 use Slim\Factory\ServerRequestCreatorFactory;
 use Slim\ResponseEmitter;
+use Slim\Routing\RouteCollectorProxy;
 use SpotifyTest\Application\Handlers\HttpErrorHandler;
 use SpotifyTest\Application\Handlers\ShutdownHandler;
 use SpotifyTest\Domain\Model\Environment\Environment;
@@ -78,7 +79,11 @@ class HttpApplication
         $request = $serverRequestCreator->createServerRequestFromGlobals();
 
         // Create Error Handler
-        $this->error_handler = new HttpErrorHandler($this->app->getCallableResolver(), $this->app->getResponseFactory());
+        $this->error_handler = new HttpErrorHandler(
+            $this->app->getCallableResolver(),
+            $this->app->getResponseFactory(),
+            $this->container_builder->get(LoggerInterface::class)
+        );
 
         // Create Shutdown Handler
         $this->shutdown_handler = new ShutdownHandler($request, $this->error_handler, $displayErrorDetails);
@@ -124,7 +129,7 @@ class HttpApplication
                 $processor = new UidProcessor();
                 $logger->pushProcessor($processor);
 
-                $handler = new StreamHandler($logger_settings['path'], Logger::$logger_settings['level']);
+                $handler = new StreamHandler(__DIR__ . $logger_settings['path'], $logger_settings['level']);
                 $logger->pushHandler($handler);
 
                 return $logger;
@@ -146,8 +151,12 @@ class HttpApplication
     {
         $this->app->get(
             '/service/health',
-            \SpotifyTest\HttpApi\Controller\ServiceController::class . ':health'
+            Controller\ServiceController::class . ':health'
         );
-    }
 
+        // API v1 routes
+        $this->app->group('/api/v1', function (RouteCollectorProxy $group) {
+            //Add api v1 routes here
+        });
+    }
 }
