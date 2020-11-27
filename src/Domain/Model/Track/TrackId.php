@@ -21,6 +21,4 @@ class TrackId extends EntityId
     {
         return EntityType::ALBUM;
     }
-
-
 }
