@@ -1,9 +1,7 @@
 <?php
 declare(strict_types=1);
 
-namespace SpotifyTest\Domain\Model;
-
-use SpotifyTest\Domain\Foundation\Entity\ValueObjectInterface;
+namespace SpotifyTest\Domain\Foundation\Entity;
 
 abstract class ValueObject implements ValueObjectInterface
 {

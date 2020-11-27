@@ -15,7 +15,15 @@ use Slim\ResponseEmitter;
 use Slim\Routing\RouteCollectorProxy;
 use SpotifyTest\Application\Handlers\HttpErrorHandler;
 use SpotifyTest\Application\Handlers\ShutdownHandler;
+use SpotifyTest\Application\Service\Spotify\SpotifyAccessToken;
+use SpotifyTest\Application\Service\Spotify\SpotifyService;
 use SpotifyTest\Domain\Model\Environment\Environment;
+use SpotifyTest\Domain\Model\Spotify\Scope;
+use SpotifyTest\Domain\Model\Spotify\BaseUri;
+use SpotifyTest\Domain\Model\Spotify\ClientId;
+use SpotifyTest\Domain\Model\Spotify\ClientSecret;
+use SpotifyTest\Domain\Model\Spotify\RedirectUri;
+use SpotifyTest\Domain\Model\Spotify\TokenType;
 
 class HttpApplication
 {
@@ -50,13 +58,14 @@ class HttpApplication
         // Instantiate PHP-DI ContainerBuilder
         $this->container_builder = new ContainerBuilder();
 
-        if (Environment::PROD == $this->env->getValue()) { // Should be set to true in production
+        if ($this->env->isProduction()) { // Should be set to true in production
             $this->container_builder->enableCompilation(__DIR__ . '/../var/cache');
         }
 
         $this->addConfigDefinitions();
         $this->addLogger();
         $this->addRepositories();
+        $this->addServices();
 
         // Build PHP-DI Container instance
         $this->container_builder = $this->container_builder->build();
@@ -80,6 +89,7 @@ class HttpApplication
 
         // Create Error Handler
         $this->error_handler = new HttpErrorHandler(
+            $this->env,
             $this->app->getCallableResolver(),
             $this->app->getResponseFactory(),
             $this->container_builder->get(LoggerInterface::class)
@@ -108,11 +118,13 @@ class HttpApplication
         // TODO: improve the way to import the config files
         $app_config = require_once __DIR__ . "../../config/app.php";
         $logger_config = require_once __DIR__ . "../../config/logger.php";
+        $spotify_config = require_once __DIR__ . "../../config/spotify.php";
 
         $this->container_builder->addDefinitions([
             'config' => [
                 'app' => $app_config,
                 'logger' => $logger_config,
+                'spotify' => $spotify_config,
             ]
         ]);
     }
@@ -120,15 +132,11 @@ class HttpApplication
     private function addLogger()
     {
         $this->container_builder->addDefinitions([
-            LoggerInterface::class => function (ContainerInterface $c) {
-                $config = $c->get('config');
-
-                $logger_settings = $config['logger'];
+            LoggerInterface::class => function (ContainerInterface $container) {
+                $logger_settings = $container->get('config')['logger'];
                 $logger = new Logger($logger_settings['name']);
-
                 $processor = new UidProcessor();
                 $logger->pushProcessor($processor);
-
                 $handler = new StreamHandler(__DIR__ . $logger_settings['path'], $logger_settings['level']);
                 $logger->pushHandler($handler);
 
@@ -140,6 +148,26 @@ class HttpApplication
     private function addRepositories()
     {
         //Add Repositories Here
+    }
+
+    private function addServices()
+    {
+        $this->container_builder->addDefinitions([
+            SpotifyService::class => function (ContainerInterface $container) {
+            $spotify_config = $container->get('config')['spotify'];
+                return new SpotifyService(
+                    new SpotifyAccessToken(
+                        new TokenType(TokenType::APP_TOKEN),
+                        new BaseUri($spotify_config['accounts_base_uri']),
+                        new ClientId($spotify_config['client_id']),
+                        new ClientSecret($spotify_config['client_secret']),
+                        new RedirectUri($spotify_config['redirect_uri']),
+                        new Scope($spotify_config['scope'])
+                    ),
+                    new BaseUri($spotify_config['api_base_uri'])
+                );
+            },
+        ]);
     }
 
     private function registerMiddlewares()
@@ -157,6 +185,10 @@ class HttpApplication
         // API v1 routes
         $this->app->group('/api/v1', function (RouteCollectorProxy $group) {
             //Add api v1 routes here
+            $group->get(
+                '/albums',
+                Controller\AlbumsController::class . ':getAlbumsList'
+            );
         });
     }
 }
