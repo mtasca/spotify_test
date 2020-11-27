@@ -5,7 +5,7 @@ namespace SpotifyTest\Domain\Model\Environment;
 
 use SpotifyTest\Application\Exception\InvalidArgumentValueException;
 use SpotifyTest\Application\Exception\MissingArgumentException;
-use SpotifyTest\Domain\Model\ValueObject;
+use SpotifyTest\Domain\Foundation\Entity\ValueObject;
 
 final class Environment extends ValueObject
 {
@@ -33,6 +33,21 @@ final class Environment extends ValueObject
             self::PROD,
             self::TEST,
         ];
+    }
+
+    public function isProduction()
+    {
+        return $this->getValue() === self::PROD;
+    }
+
+    public function isDevelopment()
+    {
+        return $this->getValue() === self::DEV;
+    }
+
+    public function isTest()
+    {
+        return $this->getValue() === self::TEST;
     }
 
 }
