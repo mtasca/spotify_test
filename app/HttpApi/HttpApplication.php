@@ -5,6 +5,7 @@ namespace SpotifyTest\HttpApi;
 
 use DI\ContainerBuilder;
 use Monolog\Logger;
+use Predis\Client as RedisClient;
 use Slim\Factory\AppFactory;
 use Monolog\Handler\StreamHandler;
 use Monolog\Processor\UidProcessor;
@@ -111,6 +112,8 @@ class HttpApplication
         $responseEmitter = new ResponseEmitter();
         $responseEmitter->emit($response);
 
+
+
     }
 
     private function addConfigDefinitions()
@@ -119,12 +122,14 @@ class HttpApplication
         $app_config = require_once __DIR__ . "../../config/app.php";
         $logger_config = require_once __DIR__ . "../../config/logger.php";
         $spotify_config = require_once __DIR__ . "../../config/spotify.php";
+        $redis_config = require_once __DIR__ . "../../config/redis.php";
 
         $this->container_builder->addDefinitions([
             'config' => [
                 'app' => $app_config,
                 'logger' => $logger_config,
                 'spotify' => $spotify_config,
+                'redis' => $redis_config,
             ]
         ]);
     }
@@ -148,6 +153,12 @@ class HttpApplication
     private function addRepositories()
     {
         //Add Repositories Here
+        $this->container_builder->addDefinitions([
+            "redis_client" => function (ContainerInterface $container) {
+                $redis_config = $container->get('config')['redis'];
+                return new RedisClient(['host' => $redis_config['host']]);
+            },
+        ]);
     }
 
     private function addServices()
@@ -162,9 +173,11 @@ class HttpApplication
                         new ClientId($spotify_config['client_id']),
                         new ClientSecret($spotify_config['client_secret']),
                         new RedirectUri($spotify_config['redirect_uri']),
-                        new Scope($spotify_config['scope'])
+                        new Scope($spotify_config['scope']),
+                        $container->get('redis_client')
                     ),
-                    new BaseUri($spotify_config['api_base_uri'])
+                    new BaseUri($spotify_config['api_base_uri']),
+                    $container->get('redis_client')
                 );
             },
         ]);
