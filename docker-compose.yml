@@ -16,3 +16,7 @@ services:
         volumes:
             - .:/var/www
             - logs:/var/www/logs
+    redis:
+        image: "library/redis"
+        ports:
+            - 6479:6479
